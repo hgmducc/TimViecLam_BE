@@ -3,61 +3,44 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TimViecLam.Models.Domain
 {
-    [Table("Users")] // Ánh xạ đến tên bảng số nhiều trong SQL
+    [Table("Users")]
     public class User
     {
-        // Khóa chính (IDENTITY(1,1) PRIMARY KEY)
         [Key]
         public int UserID { get; set; }
 
-        // NVARCHAR(100) NOT NULL
         [Required]
         [StringLength(100)]
-        public string FullName { get; set; } = string.Empty;
+        public string FullName { get; set; } = null!;
 
-        // NVARCHAR(150) NOT NULL UNIQUE
         [Required]
         [StringLength(150)]
-        public string Email { get; set; } = string.Empty;
+        public string Email { get; set; } = null!;
 
-        // NVARCHAR(20) UNIQUE NULL
-        [StringLength(20)]
-        public string? Phone { get; set; }
+        [StringLength(15)]
+        public string? Phone { get; set; } 
 
-        // NVARCHAR(255) NOT NULL
-        [Required]
         [StringLength(255)]
-        public string PasswordHash { get; set; } = string.Empty;
+        public string? PasswordHash { get; set; } 
 
-        // DATE NULL (Sử dụng DateOnly cho kiểu DATE)
-        public DateOnly? DateOfBirth { get; set; }
-
-        // NVARCHAR(10) NULL
+        public DateOnly? DateOfBirth { get; set; } 
         [StringLength(10)]
-        public string? Gender { get; set; }
+        public string? Gender { get; set; } 
 
-        // NVARCHAR(255) NULL
-        [StringLength(255)]
-        public string? Address { get; set; }
-
-        // NVARCHAR(20) NOT NULL (ràng buộc CHECK(Role IN (...)) được xử lý ở lớp logic/database)
         [Required]
         [StringLength(20)]
-        public string Role { get; set; } = string.Empty;
+        public string Role { get; set; } = null!;
 
-        // DATETIME2 DEFAULT SYSDATETIME()
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
 
-        // DATETIME2 DEFAULT SYSDATETIME()
-        public DateTime UpdatedAt { get; set; } = DateTime.Now;
-
-        // NVARCHAR(20) DEFAULT N'Active'
+        [Required]
         [StringLength(20)]
-        public string Status { get; set; } = "Active";
+        public string Status { get; set; } = null!;
 
-        // --- Thuộc tính điều hướng (Navigation Properties) cho mối quan hệ 1-1 ---
-        public Administrator? Administrator { get; set; }
-        public Employer? Employer { get; set; }
-        public Candidate? Candidate { get; set; }
+        // Thuộc tính điều hướng
+        public virtual Administrator? Administrator { get; set; }
+        public virtual Employer? Employer { get; set; }
+        public virtual Candidate? Candidate { get; set; }
     }
 }

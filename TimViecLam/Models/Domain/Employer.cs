@@ -6,29 +6,23 @@ namespace TimViecLam.Models.Domain
     [Table("Employers")]
     public class Employer
     {
-        // Khóa chính riêng
-        [Key]
-        public int EmployerID { get; set; }
+        [Key] // 1. Đây là Khóa Chính
+        [ForeignKey("User")] // 2. Nó CŨNG LÀ Khóa Ngoại trỏ đến User
+        public int EmployerID { get; set; } // Sẽ nhận giá trị của UserID
 
-        // Khóa ngoại NOT NULL UNIQUE
-        [Required]
-        public int UserID { get; set; }
+        // 3. KHÔNG CẦN thuộc tính 'UserID' riêng biệt
 
-        // NVARCHAR(150) NOT NULL
         [Required]
         [StringLength(150)]
-        public string CompanyName { get; set; } = string.Empty;
-
-        [StringLength(255)]
-        public string? CompanyAddress { get; set; }
+        public string CompanyName { get; set; } = null!; // NOT NULL
 
         [StringLength(255)]
         public string? CompanyWebsite { get; set; }
 
-        public string? CompanyDescription { get; set; } // NVARCHAR(MAX) NULL
+        public string? CompanyDescription { get; set; } // nvarchar(MAX)
 
         [StringLength(50)]
-        public string? TaxCode { get; set; } // UNIQUE NULL
+        public string? TaxCode { get; set; }
 
         [StringLength(100)]
         public string? BusinessLicenseNumber { get; set; }
@@ -36,9 +30,9 @@ namespace TimViecLam.Models.Domain
         [StringLength(255)]
         public string? BusinessLicenseFile { get; set; }
 
-        // NVARCHAR(30) DEFAULT N'Chưa xác minh'
+        [Required]
         [StringLength(30)]
-        public string VerificationStatus { get; set; } = "Chưa xác minh";
+        public string VerificationStatus { get; set; } = null!; // NOT NULL
 
         [StringLength(100)]
         public string? ContactPerson { get; set; }
@@ -49,10 +43,7 @@ namespace TimViecLam.Models.Domain
         [StringLength(20)]
         public string? ContactPhone { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
-
-        // Thuộc tính điều hướng
-        [ForeignKey("UserID")]
-        public User User { get; set; } = null!;
+        // 4. Thuộc tính điều hướng ngược lại
+        public virtual User User { get; set; } = null!;
     }
 }

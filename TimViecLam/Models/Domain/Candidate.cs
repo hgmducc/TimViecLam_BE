@@ -6,25 +6,23 @@ namespace TimViecLam.Models.Domain
     [Table("Candidates")]
     public class Candidate
     {
-        // Khóa chính riêng
         [Key]
-        public int CandidateID { get; set; }
+        [ForeignKey("User")]
+        public int CandidateID { get; set; } // Đây LÀ UserID
 
-        // Khóa ngoại NOT NULL UNIQUE
-        [Required]
-        public int UserID { get; set; }
+        // KHÔNG CẦN thuộc tính 'UserID' riêng biệt
 
         [StringLength(100)]
-        public string? HighestEducation { get; set; } // NVARCHAR(100) NULL
+        public string? HighestEducation { get; set; }
 
         [StringLength(150)]
-        public string? Major { get; set; } // NVARCHAR(150) NULL
+        public string? Major { get; set; }
 
-        public int ExperienceYears { get; set; } = 0; // INT DEFAULT 0
+        // CSDL cho phép NULL, nên dùng int? (nullable int)
+        public int? ExperienceYears { get; set; }
 
-        public string? Skills { get; set; } // NVARCHAR(MAX)
+        public string? Skills { get; set; } // nvarchar(MAX)
 
-        // DECIMAL(12,2) NULL - [Column(TypeName=...)] đảm bảo kiểu dữ liệu SQL chính xác
         [Column(TypeName = "decimal(12, 2)")]
         public decimal? ExpectedSalary { get; set; }
 
@@ -37,10 +35,7 @@ namespace TimViecLam.Models.Domain
         [StringLength(255)]
         public string? CVUrl { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
-
         // Thuộc tính điều hướng
-        [ForeignKey("UserID")]
-        public User User { get; set; } = null!;
+        public virtual User User { get; set; } = null!;
     }
 }
