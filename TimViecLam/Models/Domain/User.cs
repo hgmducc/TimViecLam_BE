@@ -25,7 +25,10 @@ namespace TimViecLam.Models.Domain
 
         public DateOnly? DateOfBirth { get; set; } 
         [StringLength(10)]
-        public string? Gender { get; set; } 
+        public string? Gender { get; set; }
+        
+        [StringLength(255)]
+        public string? Address { get; set; }
 
         [Required]
         [StringLength(20)]
@@ -39,8 +42,8 @@ namespace TimViecLam.Models.Domain
         public string Status { get; set; } = null!;
 
         // Thuộc tính điều hướng
-        public virtual Administrator? Administrator { get; set; }
-        public virtual Employer? Employer { get; set; }
-        public virtual Candidate? Candidate { get; set; }
+        public  Administrator? Administrator { get; set; }
+        public  Employer? Employer { get; set; }
+        public  Candidate? Candidate { get; set; }
     }
 }
