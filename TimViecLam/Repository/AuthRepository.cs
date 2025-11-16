@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 using TimViecLam.Data;
 using TimViecLam.Models.Domain;
@@ -9,40 +9,50 @@ using TimViecLam.Models.Dto.Request;
 using TimViecLam.Models.Dto.Response;
 using TimViecLam.Repository.IRepository;
 
-
 namespace TimViecLam.Repository
 {
     public class AuthRepository : IAuthRepository
     {
         private readonly ApplicationDbContext dbContext;
-        private string secretKey;
+        private readonly IConfiguration configuration;
+        private readonly string secretKey;
 
         public AuthRepository(ApplicationDbContext dbContext, IConfiguration configuration)
         {
             this.dbContext = dbContext;
+            this.configuration = configuration;
             secretKey = configuration.GetValue<string>("ApiSetting:Secret");
         }
+
+        // (Giả sử bạn đã cập nhật DTO thành LoginRequest { string Username, string Password })
+
         public async Task<AuthResult> LoginAsync(LoginRequest requestDto)
         {
             try
             {
-                // tìm thong tin user theo email/sdt
+                // 1️⃣ Tìm user theo username (có thể là email hoặc SĐT)
+                // COMMENT: Sửa logic tìm kiếm.
+                // Gộp Email và PhoneNumber thành một câu truy vấn duy nhất
+                // dựa trên thuộc tính 'Username' mới của requestDto.
                 var user = await dbContext.Users
-                    .FirstOrDefaultAsync(u => u.Email == requestDto.Email || u.Phone == requestDto.PhoneNumber);
+                    .FirstOrDefaultAsync(u => u.Email == requestDto.Username || u.Phone == requestDto.Username);
+
+                // COMMENT: Thay đổi cách xử lý lỗi "Không tìm thấy User".
+                // Gộp chung lỗi "Không tìm thấy" và "Sai mật khẩu" thành một
+                // thông báo duy nhất. Đây là một best-practice về bảo mật
+                // để chống lại "User Enumeration Attack" (tấn công dò tìm user).
                 if (user == null)
-                {
                     return new AuthResult
                     {
                         IsSuccess = false,
-                        Status = 404,
-                        ErrorCode = "USER_NOT_FOUND",
-                        Message = "Không tìm thấy người dùng với email/số điện thoại đã cung cấp."
+                        Status = 401, // COMMENT: Trả về 401 (Unauthorized) thay vì 404
+                        ErrorCode = "INVALID_CREDENTIALS",
+                        Token = "", // COMMENT: Thêm Token = "" cho thống nhất
+                        Message = "Tài khoản hoặc mật khẩu không chính xác." // COMMENT: Thông báo chung
                     };
-                }
 
-                // Nếu user đăng ký bằng Google thì không có password
+                // 2️⃣ Nếu user đăng ký bằng Google thì không có password (Logic này vẫn giữ nguyên)
                 if (user.PasswordHash == null)
-                {
                     return new AuthResult
                     {
                         IsSuccess = false,
@@ -50,41 +60,55 @@ namespace TimViecLam.Repository
                         ErrorCode = "GOOGLE_LOGIN_REQUIRED",
                         Message = "Tài khoản này được đăng ký bằng Google. Vui lòng đăng nhập bằng Google."
                     };
-                }
 
-                // kiểm tra mật khẩu
+                // 3️⃣ Kiểm tra mật khẩu
+                // COMMENT: requestDto.Password vẫn được sử dụng như cũ
                 bool isPasswordValid = BCrypt.Net.BCrypt.Verify(requestDto.Password, user.PasswordHash);
-                if(!isPasswordValid)
-                {
+
+                if (!isPasswordValid)
                     return new AuthResult
                     {
                         IsSuccess = false,
                         Status = 401,
                         ErrorCode = "INVALID_CREDENTIALS",
-                        Token = "",
-                        Message = "Mật khẩu không đúng. Vui lòng thử lại."
+                        Token = "", // Giữ nguyên
+                        Message = "Tài khoản hoặc mật khẩu không chính xác." // COMMENT: Dùng thông báo chung
                     };
-                }
 
-                // tồn tại sinh token 
-                var token = new JwtSecurityTokenHandler();
-                var key = Encoding.UTF8.GetBytes(secretKey);
+                // 4️⃣ Tạo JWT token (Logic này vẫn giữ nguyên)
+                var key = Encoding.UTF8.GetBytes(secretKey); // (secretKey lấy từ configuration)
+                var tokenHandler = new JwtSecurityTokenHandler();
                 var tokenDescriptor = new SecurityTokenDescriptor
                 {
+                    Subject = new ClaimsIdentity(new[]
+                    {
+                new Claim(JwtRegisteredClaimNames.Sub, user.UserID.ToString()),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email),
+                new Claim("role", user.Role),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            }),
+                    Expires = DateTime.UtcNow.AddMinutes(double.Parse(configuration["ApiSetting:ExpiresInMinutes"])),
+                    Issuer = configuration["ApiSetting:Issuer"],
+                    Audience = configuration["ApiSetting:Audience"],
+                    SigningCredentials = new SigningCredentials(
+                        new SymmetricSecurityKey(key),
+                        SecurityAlgorithms.HmacSha256Signature
+                    )
+                };
 
-                }
+                var token = tokenHandler.CreateToken(tokenDescriptor);
+                var jwtToken = tokenHandler.WriteToken(token);
 
-                // Đăng nhập thành công
                 return new AuthResult
                 {
                     IsSuccess = true,
                     Status = 200,
-                    Message = "Đăng nhập thành công."
+                    Message = "Đăng nhập thành công.",
+                    Token = jwtToken
                 };
             }
             catch (Exception ex)
             {
-                // Log lỗi nếu cần thiết
                 return new AuthResult
                 {
                     IsSuccess = false,
@@ -94,27 +118,23 @@ namespace TimViecLam.Repository
                 };
             }
         }
-
         public async Task<AuthResult> RegisterCandidateAsync(RegisterCandidateRequest requestDto)
         {
             try
             {
-                //kiểm tra email/sdt đã tồn tại chưa
-                bool emailExists = dbContext.Users.Any(u => u.Email == requestDto.Email);
-                if (emailExists == true)
-                {
-                    // Trả về lỗi 409 
+                // Kiểm tra email/sđt đã tồn tại
+                bool emailExists = await dbContext.Users.AnyAsync(u => u.Email == requestDto.Email);
+                if (emailExists)
                     return new AuthResult
                     {
                         IsSuccess = false,
-                        Status = 409, // Giả sử bạn thêm trường Status vào AuthResult
+                        Status = 409,
                         ErrorCode = "EMAIL_EXISTS",
                         Message = "Địa chỉ email này đã được đăng ký."
                     };
-                }
-                bool phoneExists = dbContext.Users.Any(u => u.Phone == requestDto.PhoneNumber);
-                if (phoneExists == true)
-                {
+
+                bool phoneExists = await dbContext.Users.AnyAsync(u => u.Phone == requestDto.PhoneNumber);
+                if (phoneExists)
                     return new AuthResult
                     {
                         IsSuccess = false,
@@ -122,9 +142,8 @@ namespace TimViecLam.Repository
                         ErrorCode = "PHONE_EXISTS",
                         Message = "Số điện thoại này đã được đăng ký."
                     };
-                }
 
-                // hash mật khẩu
+                // Hash mật khẩu
                 string hashed = BCrypt.Net.BCrypt.HashPassword(requestDto.Password, workFactor: 12);
 
                 // Tạo user mới
@@ -142,14 +161,14 @@ namespace TimViecLam.Repository
                     CreatedAt = DateTime.UtcNow,
                 };
 
-                // thêm vào database
+                // Tạo Candidate và gán
                 var newCandidate = new Candidate();
                 newUser.Candidate = newCandidate;
 
                 await dbContext.Users.AddAsync(newUser);
                 await dbContext.SaveChangesAsync();
+
                 if (newUser.UserID <= 0)
-                {
                     return new AuthResult
                     {
                         IsSuccess = false,
@@ -157,7 +176,6 @@ namespace TimViecLam.Repository
                         ErrorCode = "REGISTER_FAILED",
                         Message = "Đăng ký không thành công, vui lòng thử lại."
                     };
-                }
 
                 return new AuthResult
                 {
@@ -168,7 +186,6 @@ namespace TimViecLam.Repository
             }
             catch (Exception ex)
             {
-                // Log lỗi nếu cần thiết
                 return new AuthResult
                 {
                     IsSuccess = false,

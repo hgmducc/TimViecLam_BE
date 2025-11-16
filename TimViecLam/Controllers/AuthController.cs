@@ -1,31 +1,46 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using TimViecLam.Data;
+﻿using Microsoft.AspNetCore.Mvc;
 using TimViecLam.Models.Dto.Request;
+using TimViecLam.Repository.IRepository;
+using TimViecLam.Models.Dto.Response;
 
 namespace TimViecLam.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/auth")]
     [ApiController]
     public class AuthController : ControllerBase
     {
-        private readonly ApplicationDbContext dbContext;
+        private readonly IAuthRepository authRepository;
 
-        // inject chuỗi kết nối database
-        public AuthController(ApplicationDbContext dbContext)
+        public AuthController(IAuthRepository authRepository)
         {
-            this.dbContext = dbContext;
+            this.authRepository = authRepository;
         }
 
-        public IActionResult RegisterCandidate(RegisterCandidateRequest rgCandidateDto)
+        [HttpPost("register/candidate")]
+        public async Task<IActionResult> RegisterCandidate([FromBody] RegisterCandidateRequest requestDto)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { message = "Dữ liệu không hợp lệ." });
+            }
+
+            AuthResult result = await authRepository.RegisterCandidateAsync(requestDto);
+
+            return StatusCode(result.Status, result);
+        }
 
 
-            // mã hóa mật khẩu người dùng nhập vào
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginRequest requestDto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { message = "Dữ liệu không hợp lệ." });
+            }
 
+            AuthResult result = await authRepository.LoginAsync(requestDto);
 
-            return Ok();
+            return StatusCode(result.Status, result);
         }
     }
 }
